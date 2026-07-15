@@ -50,8 +50,8 @@ const SEGUNDOS_CARRUSEL = 10;   // rotación del menú (segundos)
 /* ============================================================ */
 
 firebase.initializeApp(firebaseConfig);
-const db = firebase.app().firestore('pantallas');
-
+const db = firebase.firestore();
+ 
 // ¿Qué pantalla soy?  ?pantalla=1 | 2 | 3
 const N = parseInt(new URLSearchParams(location.search).get('pantalla') || '1', 10);
 document.getElementById('etiqueta').textContent = 'Pantalla ' + N;
