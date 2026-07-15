@@ -229,7 +229,7 @@ const CLAVE_PANEL = "cafiver2026";   // ← cambia la contraseña aquí
 /* ============================================================ */
 
 firebase.initializeApp(firebaseConfig);
-const db=firebase.app().firestore('pantallas');
+const db=firebase.firestore();
 const storage=firebase.storage();
 const cfgRef=db.collection('letrero').doc('config');
 
