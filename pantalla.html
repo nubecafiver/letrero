@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Letrero Cafiver</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;background:#000;overflow:hidden;cursor:none;
+    font-family:'Segoe UI',system-ui,sans-serif;}
+  #escenario{width:100vw;height:100vh;position:relative;}
+  .capa{position:absolute;inset:0;width:100%;height:100%;background-position:center center;
+    background-repeat:no-repeat;background-size:contain;opacity:0;transition:opacity .8s ease-in-out;}
+  .capa.activa{opacity:1;}
+  #mural{position:absolute;inset:0;background-repeat:no-repeat;background-size:300vw 100vh;
+    opacity:0;transition:opacity .5s ease-in-out;}
+  #mural.activa{opacity:1;}
+  #aviso{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#445;font-size:2vw;text-align:center;padding:5vw;}
+  #etiqueta{position:absolute;top:20px;left:20px;background:rgba(15,40,70,.85);color:#fff;
+    padding:10px 18px;border-radius:8px;font-size:18px;z-index:50;transition:opacity 1s ease;opacity:1;}
+  #etiqueta.oculta{opacity:0;}
+</style>
+</head>
+<body>
+<div id="escenario">
+  <div id="aviso">Esperando contenido…</div>
+  <div id="capaA" class="capa"></div>
+  <div id="capaB" class="capa"></div>
+  <div id="mural"></div>
+  <div id="etiqueta">Pantalla —</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ============================================================
+   CONFIGURACIÓN  ← pega aquí tu firebaseConfig de nubecafiver
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAy9PFfIeHFGvhGQEV2leP_GmFfe3go0ls",
+  authDomain: "pantallas-8bcd2.firebaseapp.com",
+  projectId: "pantallas-8bcd2",
+  storageBucket: "pantallas-8bcd2.firebasestorage.app",
+  messagingSenderId: "1079514278940",
+  appId: "1:1079514278940:web:3ddcfd8e030cb04ebbc3d9"
+};
+
+const SEGUNDOS_CARRUSEL = 10;   // rotación del menú (segundos)
+/* ============================================================ */
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ¿Qué pantalla soy?  ?pantalla=1 | 2 | 3
+const N = parseInt(new URLSearchParams(location.search).get('pantalla') || '1', 10);
+document.getElementById('etiqueta').textContent = 'Pantalla ' + N;
+setTimeout(()=>document.getElementById('etiqueta').classList.add('oculta'), 4000);
+
+const aviso=document.getElementById('aviso');
+const capaA=document.getElementById('capaA');
+const capaB=document.getElementById('capaB');
+const mural=document.getElementById('mural');
+
+/* ---------- Estado que llega de Firestore ---------- */
+let cfg = {
+  opcion:'horario', modoManual:'menu', override:null,
+  horario:[], rotacion:[], imagenEspejo:'', imagenMural:''
+};
+let imagenesMenu = [];
+
+/* ---------- Estado de render ---------- */
+let modoActual=null, idxMenu=0, capaVisible=capaA, timerCarrusel=null;
+
+/* ---------- Utilidades de imagen ---------- */
+function mostrarImagen(url){
+  aviso.style.display='none';
+  const sig = (capaVisible===capaA)?capaB:capaA;
+  sig.style.backgroundImage = url?`url("${url}")`:'none';
+  sig.classList.add('activa'); capaVisible.classList.remove('activa'); capaVisible=sig;
+}
+function ocultarImagenes(){ capaA.classList.remove('activa'); capaB.classList.remove('activa'); }
+function pararCarrusel(){ if(timerCarrusel){ clearInterval(timerCarrusel); timerCarrusel=null; } }
+
+/* ---------- Render por modo ---------- */
+function pintarMenu(){
+  mural.classList.remove('activa');
+  if(!imagenesMenu.length){ pararCarrusel(); ocultarImagenes(); aviso.style.display='flex'; return; }
+  if(idxMenu>=imagenesMenu.length) idxMenu=0;
+  mostrarImagen(imagenesMenu[idxMenu]);
+}
+function iniciarCarrusel(){
+  pararCarrusel(); idxMenu=0; pintarMenu();
+  if(imagenesMenu.length>1){
+    timerCarrusel=setInterval(()=>{ idxMenu=(idxMenu+1)%imagenesMenu.length; mostrarImagen(imagenesMenu[idxMenu]); }, SEGUNDOS_CARRUSEL*1000);
+  }
+}
+function pintarEspejo(){
+  pararCarrusel(); mural.classList.remove('activa');
+  if(cfg.imagenEspejo) mostrarImagen(cfg.imagenEspejo);
+  else { ocultarImagenes(); aviso.style.display='flex'; }
+}
+function pintarMural(){
+  pararCarrusel(); ocultarImagenes(); mural.classList.remove('activa');
+  if(!cfg.imagenMural){ aviso.style.display='flex'; return; }
+  aviso.style.display='none';
+  mural.style.backgroundImage=`url("${cfg.imagenMural}")`;
+  const pos = (N===1)?'0%':(N===2)?'50%':'100%';
+  mural.style.backgroundPosition = pos+' center';
+  mural.classList.add('activa');
+}
+function aplicarModo(m){
+  if(m===modoActual && m==='menu') return;   // el carrusel sigue solo
+  modoActual=m;
+  if(m==='menu') iniciarCarrusel();
+  else if(m==='espejo') pintarEspejo();
+  else pintarMural();
+}
+
+/* ---------- Cerebro: decide el modo con la hora REAL ---------- */
+function aMin(s){ const [h,m]=s.split(':').map(Number); return h*60+m; }
+function modoPorHorario(minAhora){
+  for(const b of (cfg.horario||[])){
+    const d=aMin(b.desde), h=aMin(b.hasta);
+    if(d<h){ if(minAhora>=d && minAhora<h) return b.modo; }
+    else   { if(minAhora>=d || minAhora<h) return b.modo; }
+  }
+  return 'menu';
+}
+function modoPorRotacion(segEpoch){
+  const lista=(cfg.rotacion||[]).filter(r=>r.seg>0);
+  if(!lista.length) return 'menu';
+  const ciclo=lista.reduce((a,b)=>a+b.seg,0);
+  let t=segEpoch % ciclo;
+  for(const r of lista){ if(t<r.seg) return r.modo; t-=r.seg; }
+  return lista[0].modo;
+}
+function decidir(){
+  if(cfg.override) return cfg.override;
+  if(cfg.opcion==='manual')   return cfg.modoManual||'menu';
+  const ahora=new Date();
+  if(cfg.opcion==='rotacion') return modoPorRotacion(Math.floor(Date.now()/1000));
+  return modoPorHorario(ahora.getHours()*60 + ahora.getMinutes());
+}
+function evaluar(){ aplicarModo(decidir()); }
+
+/* ---------- Escuchas en tiempo real ---------- */
+db.collection('letrero').doc('config').onSnapshot(doc=>{
+  const d=doc.data()||{};
+  cfg.opcion      = d.opcion || 'horario';
+  cfg.modoManual  = d.modoManual || 'menu';
+  cfg.override    = d.override || null;
+  cfg.horario     = Array.isArray(d.horario)?d.horario:[];
+  cfg.rotacion    = Array.isArray(d.rotacion)?d.rotacion:[];
+  cfg.imagenEspejo= d.imagenEspejo||'';
+  cfg.imagenMural = d.imagenMural||'';
+  modoActual=null;        // fuerza repintar
+  evaluar();
+}, err=>console.error('config:',err));
+
+db.collection('letrero').doc('pantalla'+N).onSnapshot(doc=>{
+  const d=doc.data()||{};
+  imagenesMenu = Array.isArray(d.imagenes)?d.imagenes:[];
+  if(modoActual==='menu') iniciarCarrusel();
+}, err=>console.error('pantalla:',err));
+
+/* ---------- Reloj: re-evalúa cada 15 s (cambios de bloque/rotación) ---------- */
+setInterval(evaluar, 15*1000);
+
+/* ---------- Mantenimiento ---------- */
+setTimeout(()=>location.reload(), 6*60*60*1000);   // recarga cada 6 h
+window.addEventListener('offline', ()=>{ aviso.textContent='Reconectando…'; });
+window.addEventListener('online', ()=>location.reload());
+</script>
+</body>
+</html>
