@@ -12,6 +12,7 @@
   .capa{position:absolute;inset:0;width:100%;height:100%;background-position:center center;
     background-repeat:no-repeat;background-size:contain;opacity:0;transition:opacity .8s ease-in-out;}
   .capa.activa{opacity:1;}
+  .capa video{width:100%;height:100%;object-fit:contain;background:#000;}
   #mural{position:absolute;inset:0;background-repeat:no-repeat;background-size:300vw 100vh;
     opacity:0;transition:opacity .5s ease-in-out;}
   #mural.activa{opacity:1;}
@@ -35,7 +36,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 /* ============================================================
-   CONFIGURACIÓN  ← pega aquí tu firebaseConfig de nubecafiver
+   CONFIGURACIÓN  ← tu firebaseConfig de nubecafiver
    ============================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyAy9PFfIeHFGvhGQEV2leP_GmFfe3go0ls",
@@ -46,13 +47,12 @@ const firebaseConfig = {
   appId: "1:1079514278940:web:3ddcfd8e030cb04ebbc3d9"
 };
 
-const SEGUNDOS_CARRUSEL = 10;   // rotación del menú (segundos)
+const SEGUNDOS_CARRUSEL = 10;   // duración de cada IMAGEN (los videos duran lo que dure el video)
 /* ============================================================ */
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
- 
-// ¿Qué pantalla soy?  ?pantalla=1 | 2 | 3
+
 const N = parseInt(new URLSearchParams(location.search).get('pantalla') || '1', 10);
 document.getElementById('etiqueta').textContent = 'Pantalla ' + N;
 setTimeout(()=>document.getElementById('etiqueta').classList.add('oculta'), 4000);
@@ -62,46 +62,89 @@ const capaA=document.getElementById('capaA');
 const capaB=document.getElementById('capaB');
 const mural=document.getElementById('mural');
 
-/* ---------- Estado que llega de Firestore ---------- */
-let cfg = {
-  opcion:'horario', modoManual:'menu', override:null,
-  horario:[], rotacion:[], imagenEspejo:'', imagenMural:''
-};
-let imagenesMenu = [];
+/* ---------- ¿es video? (por extensión o por URL de Cloudinary) ---------- */
+function esVideo(url){
+  if(!url) return false;
+  const u = url.toLowerCase();
+  return /\.(mp4|webm|mov|m4v|ogg)(\?|$)/.test(u) || u.includes('/video/upload/');
+}
 
-/* ---------- Estado de render ---------- */
+/* ---------- Optimiza el video de Cloudinary al vuelo ----------
+   Inserta transformaciones en la URL para que Cloudinary entregue una
+   versión ligera: calidad automática, formato eficiente y máximo 1080p.
+   Marketing sube el MP4 pesado; la pantalla recibe la versión adelgazada. */
+function urlOptimizada(url){
+  if(url && url.includes('/video/upload/') && !url.includes('/q_auto')){
+    return url.replace('/video/upload/', '/video/upload/q_auto,f_auto,vc_auto,w_1920,c_limit/');
+  }
+  return url;
+}
+
+/* ---------- Estado ---------- */
+let cfg = { opcion:'horario', modoManual:'menu', override:null,
+  horario:[], rotacion:[], imagenEspejo:'', imagenMural:'' };
+let listaMenu = [];
 let modoActual=null, idxMenu=0, capaVisible=capaA, timerCarrusel=null;
 
-/* ---------- Utilidades de imagen ---------- */
-function mostrarImagen(url){
+/* ---------- Pinta una imagen o un video en la siguiente capa ---------- */
+function limpiarCapa(c){
+  const v=c.querySelector('video'); if(v){ v.pause(); v.src=''; }
+  c.innerHTML=''; c.style.backgroundImage='none';
+}
+function mostrar(url, opts={}){
   aviso.style.display='none';
   const sig = (capaVisible===capaA)?capaB:capaA;
-  sig.style.backgroundImage = url?`url("${url}")`:'none';
-  sig.classList.add('activa'); capaVisible.classList.remove('activa'); capaVisible=sig;
+  limpiarCapa(sig);
+  if(esVideo(url)){
+    const v=document.createElement('video');
+    v.src=urlOptimizada(url); v.autoplay=true; v.muted=true; v.setAttribute('playsinline',''); v.setAttribute('muted','');
+    v.loop = !!opts.loop;
+    if(opts.onEnded && !opts.loop) v.addEventListener('ended', opts.onEnded);
+    sig.appendChild(v);
+    v.play().catch(()=>{});
+  } else {
+    sig.style.backgroundImage = url?`url("${url}")`:'none';
+  }
+  sig.classList.add('activa');
+  const anterior=capaVisible;
+  capaVisible.classList.remove('activa');
+  capaVisible=sig;
+  // limpia la capa anterior tras el fundido (para no dejar videos sonando/corriendo)
+  setTimeout(()=>{ if(anterior!==capaVisible) limpiarCapa(anterior); }, 900);
 }
-function ocultarImagenes(){ capaA.classList.remove('activa'); capaB.classList.remove('activa'); }
-function pararCarrusel(){ if(timerCarrusel){ clearInterval(timerCarrusel); timerCarrusel=null; } }
+function ocultarTodo(){ capaA.classList.remove('activa'); capaB.classList.remove('activa'); }
+function pararCarrusel(){ if(timerCarrusel){ clearTimeout(timerCarrusel); timerCarrusel=null; } }
 
-/* ---------- Render por modo ---------- */
-function pintarMenu(){
-  mural.classList.remove('activa');
-  if(!imagenesMenu.length){ pararCarrusel(); ocultarImagenes(); aviso.style.display='flex'; return; }
-  if(idxMenu>=imagenesMenu.length) idxMenu=0;
-  mostrarImagen(imagenesMenu[idxMenu]);
-}
-function iniciarCarrusel(){
-  pararCarrusel(); idxMenu=0; pintarMenu();
-  if(imagenesMenu.length>1){
-    timerCarrusel=setInterval(()=>{ idxMenu=(idxMenu+1)%imagenesMenu.length; mostrarImagen(imagenesMenu[idxMenu]); }, SEGUNDOS_CARRUSEL*1000);
+/* ---------- Carrusel de MENÚ (imágenes + videos mezclados) ---------- */
+function pasoMenu(){
+  pararCarrusel();
+  if(!listaMenu.length){ ocultarTodo(); aviso.style.display='flex'; return; }
+  if(idxMenu>=listaMenu.length) idxMenu=0;
+  const url=listaMenu[idxMenu];
+  const unico = listaMenu.length===1;
+
+  if(esVideo(url)){
+    // video: si es el único, hace loop; si hay más, avanza al terminar
+    mostrar(url, unico ? {loop:true} : {onEnded:()=>{ idxMenu=(idxMenu+1)%listaMenu.length; pasoMenu(); }});
+  } else {
+    mostrar(url);
+    if(!unico){
+      timerCarrusel=setTimeout(()=>{ idxMenu=(idxMenu+1)%listaMenu.length; pasoMenu(); }, SEGUNDOS_CARRUSEL*1000);
+    }
   }
 }
+function iniciarMenu(){ pararCarrusel(); idxMenu=0; pasoMenu(); }
+
+/* ---------- Espejo (imagen o video, en las 3 iguales) ---------- */
 function pintarEspejo(){
   pararCarrusel(); mural.classList.remove('activa');
-  if(cfg.imagenEspejo) mostrarImagen(cfg.imagenEspejo);
-  else { ocultarImagenes(); aviso.style.display='flex'; }
+  if(!cfg.imagenEspejo){ ocultarTodo(); aviso.style.display='flex'; return; }
+  mostrar(cfg.imagenEspejo, {loop:true});   // en espejo, si es video, hace loop
 }
+
+/* ---------- Mural (SOLO imágenes, recorta el tercio) ---------- */
 function pintarMural(){
-  pararCarrusel(); ocultarImagenes(); mural.classList.remove('activa');
+  pararCarrusel(); ocultarTodo(); mural.classList.remove('activa');
   if(!cfg.imagenMural){ aviso.style.display='flex'; return; }
   aviso.style.display='none';
   mural.style.backgroundImage=`url("${cfg.imagenMural}")`;
@@ -109,66 +152,53 @@ function pintarMural(){
   mural.style.backgroundPosition = pos+' center';
   mural.classList.add('activa');
 }
+
 function aplicarModo(m){
   if(m===modoActual && m==='menu') return;   // el carrusel sigue solo
   modoActual=m;
-  if(m==='menu') iniciarCarrusel();
+  mural.classList.toggle('activa', false);
+  if(m==='menu') iniciarMenu();
   else if(m==='espejo') pintarEspejo();
   else pintarMural();
 }
 
 /* ---------- Cerebro: decide el modo con la hora REAL ---------- */
 function aMin(s){ const [h,m]=s.split(':').map(Number); return h*60+m; }
-function modoPorHorario(minAhora){
-  for(const b of (cfg.horario||[])){
-    const d=aMin(b.desde), h=aMin(b.hasta);
-    if(d<h){ if(minAhora>=d && minAhora<h) return b.modo; }
-    else   { if(minAhora>=d || minAhora<h) return b.modo; }
-  }
+function modoPorHorario(x){
+  for(const b of (cfg.horario||[])){ const d=aMin(b.desde),h=aMin(b.hasta);
+    if(d<h){ if(x>=d&&x<h) return b.modo; } else { if(x>=d||x<h) return b.modo; } }
   return 'menu';
 }
-function modoPorRotacion(segEpoch){
-  const lista=(cfg.rotacion||[]).filter(r=>r.seg>0);
-  if(!lista.length) return 'menu';
-  const ciclo=lista.reduce((a,b)=>a+b.seg,0);
-  let t=segEpoch % ciclo;
-  for(const r of lista){ if(t<r.seg) return r.modo; t-=r.seg; }
-  return lista[0].modo;
+function modoPorRotacion(seg){
+  const lista=(cfg.rotacion||[]).filter(r=>r.seg>0); if(!lista.length) return 'menu';
+  const c=lista.reduce((a,b)=>a+b.seg,0); let t=seg%c;
+  for(const r of lista){ if(t<r.seg) return r.modo; t-=r.seg; } return lista[0].modo;
 }
 function decidir(){
   if(cfg.override) return cfg.override;
-  if(cfg.opcion==='manual')   return cfg.modoManual||'menu';
-  const ahora=new Date();
+  if(cfg.opcion==='manual') return cfg.modoManual||'menu';
   if(cfg.opcion==='rotacion') return modoPorRotacion(Math.floor(Date.now()/1000));
-  return modoPorHorario(ahora.getHours()*60 + ahora.getMinutes());
+  const n=new Date(); return modoPorHorario(n.getHours()*60+n.getMinutes());
 }
 function evaluar(){ aplicarModo(decidir()); }
 
-/* ---------- Escuchas en tiempo real ---------- */
+/* ---------- Escuchas ---------- */
 db.collection('letrero').doc('config').onSnapshot(doc=>{
   const d=doc.data()||{};
-  cfg.opcion      = d.opcion || 'horario';
-  cfg.modoManual  = d.modoManual || 'menu';
-  cfg.override    = d.override || null;
-  cfg.horario     = Array.isArray(d.horario)?d.horario:[];
-  cfg.rotacion    = Array.isArray(d.rotacion)?d.rotacion:[];
-  cfg.imagenEspejo= d.imagenEspejo||'';
-  cfg.imagenMural = d.imagenMural||'';
-  modoActual=null;        // fuerza repintar
-  evaluar();
-}, err=>console.error('config:',err));
+  cfg.opcion=d.opcion||'horario'; cfg.modoManual=d.modoManual||'menu'; cfg.override=d.override||null;
+  cfg.horario=Array.isArray(d.horario)?d.horario:[]; cfg.rotacion=Array.isArray(d.rotacion)?d.rotacion:[];
+  cfg.imagenEspejo=d.imagenEspejo||''; cfg.imagenMural=d.imagenMural||'';
+  modoActual=null; evaluar();
+}, e=>console.error('config:',e));
 
 db.collection('letrero').doc('pantalla'+N).onSnapshot(doc=>{
   const d=doc.data()||{};
-  imagenesMenu = Array.isArray(d.imagenes)?d.imagenes:[];
-  if(modoActual==='menu') iniciarCarrusel();
-}, err=>console.error('pantalla:',err));
+  listaMenu = Array.isArray(d.imagenes)?d.imagenes:[];
+  if(modoActual==='menu') iniciarMenu();
+}, e=>console.error('pantalla:',e));
 
-/* ---------- Reloj: re-evalúa cada 15 s (cambios de bloque/rotación) ---------- */
 setInterval(evaluar, 15*1000);
-
-/* ---------- Mantenimiento ---------- */
-setTimeout(()=>location.reload(), 6*60*60*1000);   // recarga cada 6 h
+setTimeout(()=>location.reload(), 6*60*60*1000);
 window.addEventListener('offline', ()=>{ aviso.textContent='Reconectando…'; });
 window.addEventListener('online', ()=>location.reload());
 </script>

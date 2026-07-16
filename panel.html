@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Letrero · Cafiver</title>
+<style>
+  :root{--navy:#0f2846;--navy2:#163455;--teal:#1f8a8a;--gold:#c9962b;
+    --bg:#f4f6f9;--card:#fff;--line:#e2e8f0;--txt:#1f2937;--muted:#64748b;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);}
+
+  /* Login */
+  #login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:100;}
+  #login .caja{background:#fff;padding:40px;border-radius:14px;width:320px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3);}
+  #login h1{color:var(--navy);font-size:22px;margin-bottom:6px;}
+  #login p{color:var(--muted);font-size:14px;margin-bottom:22px;}
+  #login input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:16px;margin-bottom:14px;}
+  #login button{width:100%;padding:12px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;}
+  #login .error{color:#c0392b;font-size:13px;height:16px;margin-top:8px;}
+
+  #app{display:none;max-width:920px;margin:0 auto;padding:24px 18px 60px;}
+  header{background:var(--navy);color:#fff;border-radius:12px;padding:20px 24px;margin-bottom:22px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:20px;}
+  header .estado{font-size:13px;opacity:.9;}
+  header .estado b{color:#8fe3e3;}
+
+  .tarjeta{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px;}
+  .tarjeta h2{font-size:15px;text-transform:uppercase;letter-spacing:.5px;color:var(--navy);margin-bottom:4px;}
+  .tarjeta .sub{font-size:13px;color:var(--muted);margin-bottom:16px;}
+
+  .opciones{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .op{padding:16px 10px;border:2px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;text-align:center;transition:all .15s;}
+  .op .ic{font-size:22px;display:block;margin-bottom:6px;}
+  .op .nm{font-weight:600;font-size:14px;}
+  .op .ds{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.3;}
+  .op.on{border-color:var(--teal);background:#ecfdfd;}
+  .op.on .nm{color:var(--teal);}
+
+  .sub-panel{margin-top:16px;padding-top:16px;border-top:1px solid var(--line);display:none;}
+  .sub-panel.ver{display:block;}
+
+  /* Horario */
+  .bloque{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+  .bloque input[type=time]{padding:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;}
+  .bloque select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;}
+  .bloque .quitar{background:#fde8e8;color:#c0392b;border:none;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px;}
+  .flecha{color:var(--muted);}
+  .addbtn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;margin-top:6px;}
+
+  /* Rotación */
+  .rotfila{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+  .rotfila .et{min-width:90px;font-weight:600;}
+  .rotfila input{width:90px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;}
+  .rotfila .u{color:var(--muted);font-size:13px;}
+
+  /* Manual + override */
+  .modos-fila{display:flex;gap:8px;flex-wrap:wrap;}
+  .mbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 16px;cursor:pointer;font-size:14px;}
+  .mbtn.on{border-color:var(--teal);background:#ecfdfd;color:var(--teal);font-weight:600;}
+  .obtn{background:#fff7ec;border:1px solid #e4c07a;border-radius:8px;padding:9px 14px;cursor:pointer;color:#a5701a;font-size:14px;}
+  .obtn:hover{border-color:var(--gold);}
+  .obtn.reset{background:#f1f5f9;border-color:var(--line);color:var(--muted);}
+  .aviso-ov{margin-top:12px;background:#fff7ec;border:1px solid #e4c07a;color:#a5701a;font-size:13px;padding:8px 12px;border-radius:8px;display:none;}
+  .aviso-ov.ver{display:block;}
+
+  .guardar{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;margin-top:10px;}
+  .ok{color:var(--teal);font-size:12px;margin-left:10px;}
+
+  /* Imágenes */
+  .pestanas{display:flex;gap:6px;margin-bottom:14px;}
+  .pestana{flex:1;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;text-align:center;font-size:14px;font-weight:600;color:var(--muted);}
+  .pestana.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .subir{display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:#fff;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;border:none;}
+  input[type=file]{display:none;}
+  .barra{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:10px;display:none;}
+  .barra span{display:block;height:100%;background:var(--teal);width:0;transition:width .2s;}
+  .galeria{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}
+  .miniatura{position:relative;width:150px;height:84px;border-radius:8px;background-size:cover;background-position:center;border:1px solid var(--line);background-color:#0f2846;}
+  .miniatura .quitar{position:absolute;top:-8px;right:-8px;width:24px;height:24px;background:#c0392b;color:#fff;border:none;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;}
+  .vacio{color:var(--muted);font-size:13px;font-style:italic;margin-top:10px;}
+  .links{font-size:13px;color:var(--muted);line-height:1.8;}
+  .links code{background:#eef2f7;padding:2px 6px;border-radius:4px;color:var(--navy);}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="caja">
+    <h1>Letrero Cafiver</h1>
+    <p>Panel de control de pantallas</p>
+    <input type="password" id="clave" placeholder="Contraseña" onkeydown="if(event.key==='Enter')entrar()">
+    <button onclick="entrar()">Entrar</button>
+    <div class="error" id="loginError"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div>
+      <h1>Panel de Letrero</h1>
+      <div class="estado" id="estadoActual">Mostrando ahora: —</div>
+    </div>
+    <div class="estado">Cafiver · Tecnología de Información</div>
+  </header>
+
+  <!-- Programación -->
+  <div class="tarjeta">
+    <h2>Control de programación</h2>
+    <div class="sub">Elige cómo se controlan las 3 pantallas.</div>
+    <div class="opciones">
+      <div class="op" data-op="horario" onclick="setOpcion('horario')">
+        <span class="ic">⏱️</span><span class="nm">Automático por horario</span>
+        <div class="ds">Cada bloque del día su modo</div>
+      </div>
+      <div class="op" data-op="rotacion" onclick="setOpcion('rotacion')">
+        <span class="ic">🔁</span><span class="nm">Rotación por tiempo</span>
+        <div class="ds">Los modos se turnan en ciclo</div>
+      </div>
+      <div class="op" data-op="manual" onclick="setOpcion('manual')">
+        <span class="ic">✋</span><span class="nm">Manual</span>
+        <div class="ds">Un modo fijo</div>
+      </div>
+    </div>
+
+    <!-- Sub: horario -->
+    <div class="sub-panel" id="sub-horario">
+      <div id="listaHorario"></div>
+      <button class="addbtn" onclick="agregarBloque()">+ Agregar bloque</button>
+      <div><button class="guardar" onclick="guardarHorario()">Guardar horario</button><span class="ok" id="okHorario"></span></div>
+    </div>
+
+    <!-- Sub: rotación -->
+    <div class="sub-panel" id="sub-rotacion">
+      <div class="rotfila"><span class="et">🍽️ Menús</span><input type="number" min="0" id="rotMenu" value="60"><span class="u">segundos</span></div>
+      <div class="rotfila"><span class="et">🪞 Espejo</span><input type="number" min="0" id="rotEspejo" value="15"><span class="u">segundos</span></div>
+      <div class="rotfila"><span class="et">🖼️ Mural</span><input type="number" min="0" id="rotMural" value="20"><span class="u">segundos (0 = se salta)</span></div>
+      <button class="guardar" onclick="guardarRotacion()">Guardar rotación</button><span class="ok" id="okRotacion"></span>
+    </div>
+
+    <!-- Sub: manual -->
+    <div class="sub-panel" id="sub-manual">
+      <div class="modos-fila">
+        <button class="mbtn" data-m="menu" onclick="setManual('menu')">🍽️ Menús</button>
+        <button class="mbtn" data-m="espejo" onclick="setManual('espejo')">🪞 Espejo</button>
+        <button class="mbtn" data-m="mural" onclick="setManual('mural')">🖼️ Mural</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Override -->
+  <div class="tarjeta">
+    <h2>Forzar ahora (override)</h2>
+    <div class="sub">Ignora la programación temporalmente. Útil para un evento o anuncio urgente.</div>
+    <div class="modos-fila">
+      <button class="obtn" onclick="setOverride('menu')">Forzar Menús</button>
+      <button class="obtn" onclick="setOverride('espejo')">Forzar Espejo</button>
+      <button class="obtn" onclick="setOverride('mural')">Forzar Mural</button>
+      <button class="obtn reset" onclick="setOverride(null)">↩ Volver a automático</button>
+    </div>
+    <div class="aviso-ov" id="avisoOv"></div>
+  </div>
+
+  <!-- Imágenes de menú -->
+  <div class="tarjeta">
+    <h2>Imágenes de menú</h2>
+    <div class="sub">Imágenes y videos (MP4) rotan en carrusel. Los videos se reproducen completos.</div>
+    <div class="pestanas">
+      <div class="pestana on" data-p="1" onclick="verPestana(1)">Pantalla 1</div>
+      <div class="pestana" data-p="2" onclick="verPestana(2)">Pantalla 2</div>
+      <div class="pestana" data-p="3" onclick="verPestana(3)">Pantalla 3</div>
+    </div>
+    <label class="subir">⬆️ Subir imagen o video a Pantalla <span id="pestActual">1</span>
+      <input type="file" accept="image/*,video/mp4,video/*" onchange="subirMenu(event)"></label>
+    <div class="barra" id="barraMenu"><span></span></div>
+    <div class="galeria" id="galeriaMenu"></div>
+    <div class="vacio" id="vacioMenu">Aún no hay imágenes en esta pantalla.</div>
+  </div>
+
+  <!-- Espejo -->
+  <div class="tarjeta">
+    <h2>Imagen para modo Espejo</h2>
+    <div class="sub">Imagen o video, igual en las 3 pantallas.</div>
+    <label class="subir">⬆️ Subir imagen o video espejo
+      <input type="file" accept="image/*,video/mp4,video/*" onchange="subirUnica(event,'imagenEspejo','barraEspejo','prevEspejo')"></label>
+    <div class="barra" id="barraEspejo"><span></span></div>
+    <div class="galeria"><div class="miniatura" id="prevEspejo" style="display:none"></div></div>
+  </div>
+
+  <!-- Mural -->
+  <div class="tarjeta">
+    <h2>Imagen para modo Mural</h2>
+    <div class="sub">Una imagen MUY ancha (recomendado 5760×1080) que se parte en 3.</div>
+    <label class="subir">⬆️ Subir imagen mural
+      <input type="file" accept="image/*" onchange="subirUnica(event,'imagenMural','barraMural','prevMural')"></label>
+    <div class="barra" id="barraMural"><span></span></div>
+    <div class="galeria"><div class="miniatura" id="prevMural" style="display:none;width:280px"></div></div>
+  </div>
+
+  <!-- URLs -->
+  <div class="tarjeta">
+    <h2>URLs de las pantallas</h2>
+    <div class="links">
+      Abre cada Fire Stick en:<br>
+      <code>…/pantalla.html?pantalla=1</code><br>
+      <code>…/pantalla.html?pantalla=2</code><br>
+      <code>…/pantalla.html?pantalla=3</code>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script>
+/* ============================================================
+   CONFIGURACIÓN  ← pega aquí tu firebaseConfig de nubecafiver
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAy9PFfIeHFGvhGQEV2leP_GmFfe3go0ls",
+  authDomain: "pantallas-8bcd2.firebaseapp.com",
+  projectId: "pantallas-8bcd2",
+  storageBucket: "pantallas-8bcd2.firebasestorage.app",
+  messagingSenderId: "1079514278940",
+  appId: "1:1079514278940:web:3ddcfd8e030cb04ebbc3d9"
+};
+const CLAVE_PANEL = "cafiver2026";   // ← cambia la contraseña aquí
+
+// Cloudinary (para VIDEOS mp4). Las imágenes siguen yendo a Firebase Storage.
+const CLOUDINARY_CLOUD = "l4xgajon";
+const CLOUDINARY_PRESET = "letrero";
+/* ============================================================ */
+
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+const storage=firebase.storage();
+const cfgRef=db.collection('letrero').doc('config');
+
+let pestanaActual=1;
+let cacheMenu={1:[],2:[],3:[]};
+let cfg={opcion:'horario',modoManual:'menu',override:null,horario:[],rotacion:[],imagenEspejo:'',imagenMural:''};
+
+/* ---------- Login ---------- */
+function entrar(){
+  if(document.getElementById('clave').value===CLAVE_PANEL){
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='block';
+    arrancar();
+  } else { document.getElementById('loginError').textContent='Contraseña incorrecta'; }
+}
+
+/* ---------- Arranque ---------- */
+function arrancar(){
+  cfgRef.onSnapshot(doc=>{
+    const d=doc.data()||{};
+    // valores por defecto la primera vez
+    if(!d.opcion){ sembrarConfigInicial(); return; }
+    cfg.opcion=d.opcion; cfg.modoManual=d.modoManual||'menu'; cfg.override=d.override||null;
+    cfg.horario=Array.isArray(d.horario)?d.horario:[];
+    cfg.rotacion=Array.isArray(d.rotacion)?d.rotacion:[];
+    cfg.imagenEspejo=d.imagenEspejo||''; cfg.imagenMural=d.imagenMural||'';
+    reflejarConfig();
+  });
+  [1,2,3].forEach(n=>{
+    db.collection('letrero').doc('pantalla'+n).onSnapshot(doc=>{
+      const d=doc.data()||{};
+      cacheMenu[n]=Array.isArray(d.imagenes)?d.imagenes:[];
+      if(n===pestanaActual) pintarGaleria();
+    });
+  });
+}
+
+function sembrarConfigInicial(){
+  cfgRef.set({
+    opcion:'horario', modoManual:'menu', override:null,
+    horario:[
+      {desde:'07:00',hasta:'11:00',modo:'menu'},
+      {desde:'11:00',hasta:'11:30',modo:'mural'},
+      {desde:'11:30',hasta:'17:00',modo:'menu'},
+      {desde:'17:00',hasta:'22:00',modo:'espejo'},
+      {desde:'22:00',hasta:'07:00',modo:'mural'}
+    ],
+    rotacion:[{modo:'menu',seg:60},{modo:'espejo',seg:15},{modo:'mural',seg:20}],
+    imagenEspejo:'', imagenMural:''
+  },{merge:true});
+}
+
+/* ---------- Reflejar config en la interfaz ---------- */
+function reflejarConfig(){
+  document.querySelectorAll('.op').forEach(o=>o.classList.toggle('on',o.dataset.op===cfg.opcion));
+  document.getElementById('sub-horario').classList.toggle('ver',cfg.opcion==='horario');
+  document.getElementById('sub-rotacion').classList.toggle('ver',cfg.opcion==='rotacion');
+  document.getElementById('sub-manual').classList.toggle('ver',cfg.opcion==='manual');
+
+  pintarHorario();
+  const gr=m=>cfg.rotacion.find(r=>r.modo===m);
+  if(gr('menu'))   document.getElementById('rotMenu').value=gr('menu').seg;
+  if(gr('espejo')) document.getElementById('rotEspejo').value=gr('espejo').seg;
+  if(gr('mural'))  document.getElementById('rotMural').value=gr('mural').seg;
+
+  document.querySelectorAll('.mbtn').forEach(b=>b.classList.toggle('on',b.dataset.m===cfg.modoManual));
+
+  const av=document.getElementById('avisoOv');
+  if(cfg.override){ av.textContent='⚠ Override activo: '+cfg.override.toUpperCase()+' — ignora la programación'; av.classList.add('ver'); }
+  else av.classList.remove('ver');
+
+  pintarPreview('prevEspejo',cfg.imagenEspejo);
+  pintarPreview('prevMural',cfg.imagenMural);
+  actualizarEstadoActual();
+}
+
+/* ---------- Opción / manual / override ---------- */
+function setOpcion(op){ cfgRef.set({opcion:op},{merge:true}); }
+function setManual(m){ cfgRef.set({modoManual:m,opcion:'manual'},{merge:true}); }
+function setOverride(m){ cfgRef.set({override:m},{merge:true}); }
+
+/* ---------- Editor de horario ---------- */
+function pintarHorario(){
+  const cont=document.getElementById('listaHorario'); cont.innerHTML='';
+  cfg.horario.forEach((b,i)=>{
+    const row=document.createElement('div'); row.className='bloque';
+    row.innerHTML=`
+      <input type="time" value="${b.desde}" onchange="editarBloque(${i},'desde',this.value)">
+      <span class="flecha">→</span>
+      <input type="time" value="${b.hasta}" onchange="editarBloque(${i},'hasta',this.value)">
+      <select onchange="editarBloque(${i},'modo',this.value)">
+        <option value="menu" ${b.modo==='menu'?'selected':''}>Menús</option>
+        <option value="espejo" ${b.modo==='espejo'?'selected':''}>Espejo</option>
+        <option value="mural" ${b.modo==='mural'?'selected':''}>Mural</option>
+      </select>
+      <button class="quitar" onclick="quitarBloque(${i})">×</button>`;
+    cont.appendChild(row);
+  });
+}
+let horarioEdit=null;
+function asegurarEdit(){ if(!horarioEdit) horarioEdit=JSON.parse(JSON.stringify(cfg.horario)); }
+function editarBloque(i,campo,val){ asegurarEdit(); horarioEdit[i][campo]=val; }
+function agregarBloque(){ asegurarEdit(); horarioEdit.push({desde:'12:00',hasta:'13:00',modo:'menu'}); cfg.horario=horarioEdit; pintarHorario(); }
+function quitarBloque(i){ asegurarEdit(); horarioEdit.splice(i,1); cfg.horario=horarioEdit; pintarHorario(); }
+function guardarHorario(){
+  const datos=horarioEdit||cfg.horario;
+  cfgRef.set({horario:datos},{merge:true}).then(()=>{ horarioEdit=null; flash('okHorario','Guardado ✓'); });
+}
+
+/* ---------- Rotación ---------- */
+function guardarRotacion(){
+  const rot=[
+    {modo:'menu',   seg:parseInt(document.getElementById('rotMenu').value)||0},
+    {modo:'espejo', seg:parseInt(document.getElementById('rotEspejo').value)||0},
+    {modo:'mural',  seg:parseInt(document.getElementById('rotMural').value)||0}
+  ];
+  cfgRef.set({rotacion:rot},{merge:true}).then(()=>flash('okRotacion','Guardado ✓'));
+}
+function flash(id,msg){ const e=document.getElementById(id); e.textContent=msg; setTimeout(()=>e.textContent='',2000); }
+
+/* ---------- Estado actual (qué se ve ahora) ---------- */
+function aMin(s){ const [h,m]=s.split(':').map(Number); return h*60+m; }
+function calcModo(){
+  if(cfg.override) return cfg.override;
+  if(cfg.opcion==='manual') return cfg.modoManual;
+  if(cfg.opcion==='rotacion'){
+    const lista=cfg.rotacion.filter(r=>r.seg>0); if(!lista.length) return 'menu';
+    const ciclo=lista.reduce((a,b)=>a+b.seg,0); let t=Math.floor(Date.now()/1000)%ciclo;
+    for(const r of lista){ if(t<r.seg) return r.modo; t-=r.seg; } return lista[0].modo;
+  }
+  const now=new Date(), x=now.getHours()*60+now.getMinutes();
+  for(const b of cfg.horario){ const d=aMin(b.desde),h=aMin(b.hasta); if(d<h){if(x>=d&&x<h)return b.modo;}else{if(x>=d||x<h)return b.modo;} }
+  return 'menu';
+}
+function actualizarEstadoActual(){
+  const nm={menu:'Menús',espejo:'Espejo',mural:'Mural'}[calcModo()];
+  const modo = cfg.override?'(forzado)':cfg.opcion==='manual'?'(manual)':cfg.opcion==='rotacion'?'(rotación)':'(horario)';
+  document.getElementById('estadoActual').innerHTML='Mostrando ahora: <b>'+nm+'</b> '+modo;
+}
+setInterval(actualizarEstadoActual, 10000);
+
+/* ---------- Imágenes de menú ---------- */
+function verPestana(n){
+  pestanaActual=n;
+  document.querySelectorAll('.pestana').forEach(p=>p.classList.toggle('on',parseInt(p.dataset.p)===n));
+  document.getElementById('pestActual').textContent=n;
+  pintarGaleria();
+}
+/* ---------- ¿es video? y miniatura de video ---------- */
+function esVideo(url){
+  if(!url) return false;
+  const u=url.toLowerCase();
+  return /\.(mp4|webm|mov|m4v|ogg)(\?|$)/.test(u) || u.includes('/video/upload/');
+}
+// Cloudinary genera un cuadro (poster) del video como imagen jpg
+function posterVideo(url){
+  if(url.includes('/video/upload/')) return url.replace('/video/upload/','/video/upload/so_0,w_300,h_180,c_fill/').replace(/\.(mp4|webm|mov|m4v|ogg)(\?|$)/i,'.jpg$2');
+  return url;
+}
+
+function pintarGaleria(){
+  const cont=document.getElementById('galeriaMenu'); const lista=cacheMenu[pestanaActual]||[];
+  cont.innerHTML=''; document.getElementById('vacioMenu').style.display=lista.length?'none':'block';
+  lista.forEach((url,i)=>{
+    const div=document.createElement('div'); div.className='miniatura';
+    div.style.backgroundImage=`url("${esVideo(url)?posterVideo(url):url}")`;
+    if(esVideo(url)){
+      const play=document.createElement('div'); play.textContent='▶';
+      play.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;text-shadow:0 0 8px #000;pointer-events:none;';
+      div.appendChild(play);
+      const tag=document.createElement('div'); tag.textContent='VIDEO';
+      tag.style.cssText='position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;letter-spacing:1px;';
+      div.appendChild(tag);
+    }
+    const x=document.createElement('button'); x.className='quitar'; x.textContent='×'; x.onclick=()=>quitarMenu(i);
+    div.appendChild(x); cont.appendChild(div);
+  });
+}
+function subirMenu(ev){
+  const file=ev.target.files[0]; if(!file) return; const n=pestanaActual;
+  subirArchivo(file,`letrero/pantalla${n}/${Date.now()}_${file.name}`,'barraMenu',url=>{
+    const nuevas=[...(cacheMenu[n]||[]),url];
+    db.collection('letrero').doc('pantalla'+n).set({imagenes:nuevas},{merge:true});
+  }); ev.target.value='';
+}
+function quitarMenu(i){
+  const n=pestanaActual; const nuevas=[...cacheMenu[n]]; nuevas.splice(i,1);
+  db.collection('letrero').doc('pantalla'+n).set({imagenes:nuevas},{merge:true});
+}
+function subirUnica(ev,campo,idBarra,idPrev){
+  const file=ev.target.files[0]; if(!file) return;
+  subirArchivo(file,`letrero/${campo}/${Date.now()}_${file.name}`,idBarra,url=>{
+    cfgRef.set({[campo]:url},{merge:true});
+  }); ev.target.value='';
+}
+
+/* ---------- Enrutador de subida: VIDEO->Cloudinary, IMAGEN->Firebase ---------- */
+function subirArchivo(file,ruta,idBarra,alTerminar){
+  if(file.type && file.type.startsWith('video/')) subirCloudinary(file,idBarra,alTerminar);
+  else subirFirebase(file,ruta,idBarra,alTerminar);
+}
+function subirFirebase(file,ruta,idBarra,alTerminar){
+  const barra=document.getElementById(idBarra); const relleno=barra.querySelector('span');
+  barra.style.display='block'; relleno.style.width='0';
+  const tarea=storage.ref(ruta).put(file);
+  tarea.on('state_changed',
+    s=>{ relleno.style.width=(s.bytesTransferred/s.totalBytes*100)+'%'; },
+    e=>{ alert('Error al subir imagen: '+e.message); barra.style.display='none'; },
+    ()=>{ tarea.snapshot.ref.getDownloadURL().then(url=>{ alTerminar(url); setTimeout(()=>barra.style.display='none',500); }); }
+  );
+}
+function subirCloudinary(file,idBarra,alTerminar){
+  const barra=document.getElementById(idBarra); const relleno=barra.querySelector('span');
+  barra.style.display='block'; relleno.style.width='0';
+  const fd=new FormData(); fd.append('file',file); fd.append('upload_preset',CLOUDINARY_PRESET);
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST',`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`);
+  xhr.upload.onprogress=e=>{ if(e.lengthComputable) relleno.style.width=(e.loaded/e.total*100)+'%'; };
+  xhr.onload=()=>{
+    if(xhr.status>=200 && xhr.status<300){
+      const r=JSON.parse(xhr.responseText);
+      alTerminar(r.secure_url); setTimeout(()=>barra.style.display='none',500);
+    } else { alert('Error al subir video a Cloudinary: '+xhr.responseText); barra.style.display='none'; }
+  };
+  xhr.onerror=()=>{ alert('Error de red al subir el video.'); barra.style.display='none'; };
+  xhr.send(fd);
+}
+
+function pintarPreview(id,url){
+  const el=document.getElementById(id);
+  if(url){ el.style.display='block'; el.style.backgroundImage=`url("${esVideo(url)?posterVideo(url):url}")`; }
+  else el.style.display='none';
+}
+</script>
+</body>
+</html>
