@@ -111,13 +111,19 @@ FORM get_data.
       AND vtweg IN s_vtweg
       AND spart IN s_spart
       AND vkbur IN s_vkbur.
-  CHECK lt_vbak IS NOT INITIAL.
+  IF lt_vbak IS INITIAL.
+    MESSAGE 'No hay pedidos en VBAK con esa seleccion (tipo VBTYP = C)' TYPE 'I'.
+    RETURN.
+  ENDIF.
 
   SELECT * FROM vbap INTO TABLE lt_vbap
     FOR ALL ENTRIES IN lt_vbak
     WHERE vbeln = lt_vbak-vbeln
       AND matnr IN s_matnr.
-  CHECK lt_vbap IS NOT INITIAL.
+  IF lt_vbap IS INITIAL.
+    MESSAGE 'Hay pedidos en VBAK pero ninguna posicion en VBAP con ese material' TYPE 'I'.
+    RETURN.
+  ENDIF.
 
   SELECT * FROM vbuk INTO TABLE lt_vbuk
     FOR ALL ENTRIES IN lt_vbak
@@ -207,6 +213,9 @@ FORM get_data.
   ENDLOOP.
 
   SORT gt_out BY vbeln posnr.
+  IF gt_out IS INITIAL.
+    MESSAGE 'Se descartaron todos los registros por el filtro de estado' TYPE 'I'.
+  ENDIF.
 ENDFORM.
 
 *---------------------------------------------------------------------*
@@ -219,7 +228,6 @@ FORM show_alv.
         lv_msg  TYPE string.
 
   IF gt_out IS INITIAL.
-    MESSAGE 'No se encontraron pedidos' TYPE 'S' DISPLAY LIKE 'W'.
     RETURN.
   ENDIF.
 
