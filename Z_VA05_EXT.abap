@@ -100,7 +100,6 @@ FORM get_data.
 
   SELECT * FROM vbak INTO TABLE lt_vbak
     WHERE vbeln IN s_vbeln
-      AND vbtyp = 'C'
       AND kunnr IN s_kunnr
       AND bstnk IN s_bstnk
       AND auart IN s_auart
@@ -112,7 +111,7 @@ FORM get_data.
       AND spart IN s_spart
       AND vkbur IN s_vkbur.
   IF lt_vbak IS INITIAL.
-    MESSAGE 'No hay pedidos en VBAK con esa seleccion (tipo VBTYP = C)' TYPE 'I'.
+    MESSAGE 'No hay pedidos en VBAK con esa seleccion' TYPE 'I'.
     RETURN.
   ENDIF.
 
