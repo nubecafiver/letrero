@@ -212,7 +212,11 @@ ENDFORM.
 *---------------------------------------------------------------------*
 FORM show_alv.
   DATA: lo_alv  TYPE REF TO cl_salv_table,
-        lo_cols TYPE REF TO cl_salv_columns_table.
+        lo_cols TYPE REF TO cl_salv_columns_table,
+        lo_func TYPE REF TO cl_salv_functions_list,
+        lo_disp TYPE REF TO cl_salv_display_settings,
+        lx      TYPE REF TO cx_root,
+        lv_msg  TYPE string.
 
   IF gt_out IS INITIAL.
     MESSAGE 'No se encontraron pedidos' TYPE 'S' DISPLAY LIKE 'W'.
@@ -222,9 +226,11 @@ FORM show_alv.
   TRY.
       cl_salv_table=>factory( IMPORTING r_salv_table = lo_alv
                               CHANGING  t_table      = gt_out ).
-      lo_alv->get_functions( )->set_all( abap_true ).
-      lo_alv->get_display_settings( )->set_list_header( 'Pedidos de venta (VA05 ext.)' ).
-      lo_alv->get_display_settings( )->set_striped_pattern( abap_true ).
+      lo_func = lo_alv->get_functions( ).
+      lo_func->set_all( abap_true ).
+      lo_disp = lo_alv->get_display_settings( ).
+      lo_disp->set_list_header( 'Pedidos de venta (VA05 ext.)' ).
+      lo_disp->set_striped_pattern( abap_true ).
       lo_cols = lo_alv->get_columns( ).
       lo_cols->set_optimize( abap_true ).
 
@@ -251,20 +257,27 @@ FORM show_alv.
       PERFORM set_title USING lo_cols 'P_POSEX_E' 'Pos Dest: Posicion pedido'.
 
       lo_alv->display( ).
-    CATCH cx_salv_msg cx_salv_not_found cx_salv_data_error INTO DATA(lx).
-      MESSAGE lx->get_text( ) TYPE 'E'.
+    CATCH cx_root INTO lx.
+      lv_msg = lx->get_text( ).
+      MESSAGE lv_msg TYPE 'E'.
   ENDTRY.
 ENDFORM.
 
 FORM set_title USING io_cols TYPE REF TO cl_salv_columns_table
                      iv_name TYPE lvc_fname
                      iv_text TYPE csequence.
-  DATA lo_col TYPE REF TO cl_salv_column.
+  DATA: lo_col TYPE REF TO cl_salv_column,
+        lv_l   TYPE scrtext_l,
+        lv_m   TYPE scrtext_m,
+        lv_s   TYPE scrtext_s.
+  lv_l = iv_text.
+  lv_m = iv_text.
+  lv_s = iv_text.
   TRY.
       lo_col = io_cols->get_column( iv_name ).
-      lo_col->set_long_text( CONV #( iv_text ) ).
-      lo_col->set_medium_text( CONV #( iv_text ) ).
-      lo_col->set_short_text( CONV #( iv_text ) ).
+      lo_col->set_long_text( lv_l ).
+      lo_col->set_medium_text( lv_m ).
+      lo_col->set_short_text( lv_s ).
     CATCH cx_salv_not_found.
   ENDTRY.
 ENDFORM.
