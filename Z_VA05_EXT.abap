@@ -79,6 +79,12 @@ SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
 SELECT-OPTIONS: s_gbstk FOR vbuk-gbstk.
 SELECTION-SCREEN END OF BLOCK b2.
 
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
+PARAMETERS: p_pend  RADIOBUTTON GROUP al,
+            p_todos RADIOBUTTON GROUP al DEFAULT 'X',
+            p_mis   AS CHECKBOX.
+SELECTION-SCREEN END OF BLOCK b3.
+
 START-OF-SELECTION.
   PERFORM get_data.
   PERFORM show_alv.
@@ -108,6 +114,10 @@ FORM get_data.
       AND vtweg IN s_vtweg
       AND spart IN s_spart
       AND vkbur IN s_vkbur.
+  " Mis pedidos cliente: solo los creados por el usuario actual
+  IF p_mis = 'X'.
+    DELETE lt_vbak WHERE ernam <> sy-uname.
+  ENDIF.
   IF lt_vbak IS INITIAL.
     MESSAGE 'No hay pedidos en VBAK con esa seleccion' TYPE 'I'.
     RETURN.
@@ -145,6 +155,8 @@ FORM get_data.
     ENDIF.
     " Filtro por StatusGlob (A = abierto, B = parcial, C = completo)
     IF gs_out-gbstk NOT IN s_gbstk. CONTINUE. ENDIF.
+    " Alcance: pedidos pendientes = no completos
+    IF p_pend = 'X' AND gs_out-gbstk = 'C'. CONTINUE. ENDIF.
 
     gs_out-vbeln  = <vbap>-vbeln.
     gs_out-posnr  = <vbap>-posnr.
