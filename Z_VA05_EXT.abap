@@ -6,7 +6,7 @@
 *&---------------------------------------------------------------------*
 REPORT z_va05_ext.
 
-TABLES: vbak, vbap, kna1.
+TABLES: vbak, vbap, kna1, vbuk.
 
 TYPES: BEGIN OF ty_out,
          vbeln     TYPE vbak-vbeln,
@@ -76,9 +76,7 @@ SELECT-OPTIONS: s_kunnr FOR vbak-kunnr,
 SELECTION-SCREEN END OF BLOCK b1.
 
 SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
-PARAMETERS: p_all  RADIOBUTTON GROUP st DEFAULT 'X',
-            p_open RADIOBUTTON GROUP st,
-            p_done RADIOBUTTON GROUP st.
+SELECT-OPTIONS: s_gbstk FOR vbuk-gbstk.
 SELECTION-SCREEN END OF BLOCK b2.
 
 START-OF-SELECTION.
@@ -145,9 +143,8 @@ FORM get_data.
     IF sy-subrc = 0.
       gs_out-gbstk = <vbuk>-gbstk.
     ENDIF.
-    " Filtro de status (A = abierto, C = completo)
-    IF p_open = 'X' AND gs_out-gbstk = 'C'. CONTINUE. ENDIF.
-    IF p_done = 'X' AND gs_out-gbstk <> 'C'. CONTINUE. ENDIF.
+    " Filtro por StatusGlob (A = abierto, B = parcial, C = completo)
+    IF gs_out-gbstk NOT IN s_gbstk. CONTINUE. ENDIF.
 
     gs_out-vbeln  = <vbap>-vbeln.
     gs_out-posnr  = <vbap>-posnr.
@@ -213,7 +210,7 @@ FORM get_data.
 
   SORT gt_out BY vbeln posnr.
   IF gt_out IS INITIAL.
-    MESSAGE 'Se descartaron todos los registros por el filtro de estado' TYPE 'I'.
+    MESSAGE 'Se descartaron todos los registros por el filtro de StatusGlob' TYPE 'I'.
   ENDIF.
 ENDFORM.
 
